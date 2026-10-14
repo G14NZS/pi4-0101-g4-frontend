@@ -1,0 +1,70 @@
+:root {
+  /* Cores */
+  --cor-fundo: #f4f5f1;
+  --cor-superficie: #ffffff;
+  --cor-texto: #16201c;
+  --cor-texto-suave: #3f4b46;
+  --cor-texto-mudo: #55615c;
+  --cor-destaque: #1f6f5c;
+  --cor-destaque-hover: #164f42;
+  --cor-destaque-claro: #e3efea;
+  --cor-destaque-sobre-escuro: #9fd3c2;
+  --cor-texto-sobre-escuro: #d3dbd7;
+  --cor-borda: #d5d9d3;
+  --cor-borda-campo: #c9cec7;
+  --cor-trilho: #eef0eb;
+  --cor-erro-fundo: #fcebe4;
+  --cor-erro-texto: #7a2e12;
+  --cor-aviso-texto: #23332d;
+
+  /* Tipografia */
+  --fonte-titulo: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --fonte-texto: 'Figtree', 'Segoe UI', system-ui, sans-serif;
+
+  /* Layout */
+  --largura-conteudo: 1160px;
+  --margem-lateral: 32px;
+  --sombra-cartao: 0 1px 2px rgba(22, 32, 28, 0.06), 0 18px 40px rgba(22, 32, 28, 0.1);
+}
+
+@media (max-width: 600px) {
+  :root {
+    --margem-lateral: 16px;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font-family: var(--fonte-texto);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+a {
+  color: var(--cor-destaque);
+}
+
+a:hover {
+  color: var(--cor-destaque-hover);
+}
+
+:focus-visible {
+  outline: 2px solid var(--cor-destaque);
+  outline-offset: 2px;
+}
+
+.conteudo {
+  max-width: var(--largura-conteudo);
+  margin: 0 auto;
+  padding-left: var(--margem-lateral);
+  padding-right: var(--margem-lateral);
+}
