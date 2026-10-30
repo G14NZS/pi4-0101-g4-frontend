@@ -10,9 +10,11 @@ import CampoFormulario from '@/components/CampoFormulario.vue'
 import SiteHeader from '@/components/SiteHeader.vue'
 import { useSessaoStore } from '@/stores/sessao'
 
-// Limites da ficha do CT2 cadastrarServico.
+// Limites do CT2 cadastrarServico (ficha + colunas do CT15 no Backend 1).
 const DURACAO_MIN = 15
 const DURACAO_MAX = 480
+const NOME_MAX = 100
+const PRECO_MAX = 99999999.99
 
 const router = useRouter()
 const sessao = useSessaoStore()
@@ -64,7 +66,12 @@ async function carregarServicos() {
 
 // Mesmas regras que o Backend 1 confere (DADOS_INVALIDOS), para avisar antes de enviar.
 function validar() {
-  errosCampos.servicoNome = novo.servicoNome.trim() ? '' : 'Informe o nome do serviço.'
+  const nome = novo.servicoNome.trim()
+  errosCampos.servicoNome = !nome
+    ? 'Informe o nome do serviço.'
+    : nome.length > NOME_MAX
+      ? `O nome do serviço pode ter até ${NOME_MAX} caracteres.`
+      : ''
 
   const duracao = Number(novo.duracaoMinutos)
   errosCampos.duracaoMinutos =
@@ -76,9 +83,10 @@ function validar() {
       : `A duração deve ser um número inteiro de ${DURACAO_MIN} a ${DURACAO_MAX} minutos.`
 
   const preco = lerPreco(novo.preco)
-  errosCampos.preco = Number.isNaN(preco)
-    ? 'Informe um preço válido, sem valor negativo (ex.: 35,00).'
-    : ''
+  errosCampos.preco =
+    Number.isNaN(preco) || preco > PRECO_MAX
+      ? 'Informe um preço válido, sem valor negativo (ex.: 35,00).'
+      : ''
 
   return !errosCampos.servicoNome && !errosCampos.duracaoMinutos && !errosCampos.preco
 }
@@ -153,7 +161,7 @@ onMounted(carregarServicos)
           rotulo="Nome do serviço"
           placeholder="Manicure simples"
           :erro="errosCampos.servicoNome"
-          maxlength="120"
+          :maxlength="NOME_MAX"
           required
         />
         <div class="formulario__linha">
