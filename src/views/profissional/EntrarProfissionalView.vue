@@ -1,12 +1,13 @@
 <script setup>
 import { ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import AppAviso from '@/components/AppAviso.vue'
 import AppBotao from '@/components/AppBotao.vue'
 import AppIcone from '@/components/AppIcone.vue'
 import CampoFormulario from '@/components/CampoFormulario.vue'
 import SiteHeader from '@/components/SiteHeader.vue'
+import { useSessaoStore } from '@/stores/sessao'
 
 const destaques = [
   { icone: 'lista', texto: 'Cadastre seus serviços com duração e preço.' },
@@ -14,14 +15,39 @@ const destaques = [
   { icone: 'calendario', texto: 'Acompanhe a agenda do dia em ordem de horário.' },
 ]
 
+const route = useRoute()
+const router = useRouter()
+const sessao = useSessaoStore()
+
 const email = ref('')
 const senha = ref('')
 const erro = ref('')
+const enviando = ref(false)
+// Chegou aqui porque o token venceu (guarda de rota ou 401 NAO_AUTENTICADO).
+const expirou = ref(route.query.expirou === '1')
 
-function entrar() {
+// Só aceita caminhos internos em `voltar`, para não virar redirecionamento aberto.
+function destinoDepoisDoLogin() {
+  const voltar = route.query.voltar
+  if (typeof voltar === 'string' && voltar.startsWith('/') && !voltar.startsWith('//')) {
+    return voltar
+  }
+  return { name: 'meus-servicos' }
+}
+
+async function entrar() {
   erro.value = ''
-  // TODO: chamar CT1 abrirSessao quando o contrato do Backend 1 estiver disponível.
-  // Em caso de falha, mostrar a mensagem: erro.value = e.mensagem
+  expirou.value = false
+  enviando.value = true
+  try {
+    await sessao.entrar({ email: email.value.trim(), senha: senha.value })
+    router.replace(destinoDepoisDoLogin())
+  } catch (e) {
+    erro.value = e.mensagem
+    senha.value = ''
+  } finally {
+    enviando.value = false
+  }
 }
 </script>
 
@@ -55,6 +81,9 @@ function entrar() {
         </div>
 
         <AppAviso v-if="erro" tipo="erro">{{ erro }}</AppAviso>
+        <AppAviso v-else-if="expirou" tipo="info">
+          Sua sessão expirou. Entre de novo para continuar.
+        </AppAviso>
 
         <CampoFormulario
           id="prof-email"
@@ -74,7 +103,9 @@ function entrar() {
           required
         />
 
-        <AppBotao tipo="submit" tamanho="g" bloco>Entrar no painel</AppBotao>
+        <AppBotao tipo="submit" tamanho="g" bloco :desabilitado="enviando">
+          {{ enviando ? 'Entrando…' : 'Entrar no painel' }}
+        </AppBotao>
 
         <p class="nota">
           Ainda não tem acesso? As contas de profissional são criadas pela equipe do sistema.
