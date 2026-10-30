@@ -5,11 +5,35 @@ Decisões de arquitetura em `docs/adr/` e fluxos em `docs/fluxos/`.
 
 ## Rodando
 
+O frontend conversa com o [Backend 1](../pi4-0101-g4-backend-1), que roda em Docker. Suba ele primeiro:
+
+```sh
+# na pasta do pi4-0101-g4-backend-1
+docker compose up -d --build   # MySQL + API em http://localhost:8080
+```
+
+Depois, nesta pasta:
+
 ```sh
 npm install
-cp .env.example .env   # ajuste VITE_API_URL para o Backend 1
-npm run dev
+cp .env.example .env   # VITE_API_URL=http://localhost:8080 (o padrão do Backend 1)
+npm run dev            # http://localhost:5175
 ```
+
+Abra **http://localhost:5175** (não `127.0.0.1`): o Backend 1 só libera CORS para essa origem
+(variável `CORS_ORIGENS` no `docker-compose.yml` dele). Por isso o Vite usa a porta 5175 fixa e não sobe se ela
+estiver ocupada; nesse caso, libere a porta ou acrescente a nova origem em `CORS_ORIGENS`.
+
+Login de teste (criado pelo `db/dados-dev.sql` do Backend 1): **ana@exemplo.com / segredo123**.
+
+## O que já funciona
+
+| História | Tela | Contratos |
+|---|---|---|
+| H02.3 | Login do profissional (`/profissional/entrar`) e Meus serviços (`/profissional/servicos`) | CT1, CT2, CT3 |
+| H04.2 | Link do profissional (`/p/{profissionalSlug}`): serviço, dia, horário livre, nome e celular, revisão e confirmação | CT3, CT5, CT7 |
+
+O token do CT1 é um JWT com `exp`: quando ele vence, a tela volta sozinha ao login.
 
 ## Estrutura
 
