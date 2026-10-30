@@ -1,33 +1,95 @@
 <script setup>
-import { reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import AppAviso from '@/components/AppAviso.vue'
 import AppBotao from '@/components/AppBotao.vue'
 import AppIcone from '@/components/AppIcone.vue'
 import CampoFormulario from '@/components/CampoFormulario.vue'
 import SiteHeader from '@/components/SiteHeader.vue'
+import { useClienteStore } from '@/stores/cliente'
+import { lerPendente } from '@/utils/agendamentoPendente'
+import { formatarTelefone, normalizarTelefone } from '@/utils/formatos'
 
 const route = useRoute()
+const router = useRouter()
+const cliente = useClienteStore()
 
 // A tela inicial abre direto na aba "Criar conta" com ?aba=criar.
 const aba = ref(route.query.aba === 'criar' ? 'criar' : 'entrar')
 
-const login = reactive({ email: '', senha: '' })
-const cadastro = reactive({ nome: '', telefone: '', email: '', senha: '' })
+// Só aceita caminhos internos em `voltar`, para não virar redirecionamento aberto.
+const voltar = computed(() => {
+  const destino = route.query.voltar
+  return typeof destino === 'string' && destino.startsWith('/') && !destino.startsWith('//')
+    ? destino
+    : null
+})
 
-function entrar() {
-  // TODO: integrar com o Backend 1 quando o contrato de login do cliente existir.
+// Vindo do link do profissional, o nome e o celular já digitados entram no cadastro.
+const pendente = voltar.value ? lerPendente() : null
+
+const login = reactive({ email: '', senha: '' })
+const cadastro = reactive({
+  nome: pendente?.clienteNome ?? '',
+  telefone: pendente?.clienteTelefone ?? '',
+  email: '',
+  senha: '',
+})
+const erroTelefone = ref('')
+const erro = ref('')
+const enviando = ref(false)
+
+watch(aba, () => {
+  erro.value = ''
+})
+
+function depoisDeEntrar() {
+  if (voltar.value) router.replace(voltar.value)
 }
 
-function criarConta() {
-  // TODO: integrar com o Backend 1 quando o contrato de cadastro do cliente existir.
+async function entrar() {
+  erro.value = ''
+  enviando.value = true
+  try {
+    await cliente.entrar({ email: login.email.trim(), senha: login.senha })
+    depoisDeEntrar()
+  } catch (e) {
+    erro.value = e.mensagem
+    login.senha = ''
+  } finally {
+    enviando.value = false
+  }
+}
+
+async function criarConta() {
+  erro.value = ''
+  const clienteTelefone = normalizarTelefone(cadastro.telefone)
+  erroTelefone.value = clienteTelefone
+    ? ''
+    : 'Informe um celular com DDD, por exemplo (19) 98888-7777.'
+  if (!clienteTelefone) return
+
+  enviando.value = true
+  try {
+    await cliente.criarConta({
+      clienteNome: cadastro.nome.trim(),
+      clienteTelefone,
+      email: cadastro.email.trim(),
+      senha: cadastro.senha,
+    })
+    depoisDeEntrar()
+  } catch (e) {
+    erro.value = e.mensagem
+  } finally {
+    enviando.value = false
+  }
 }
 </script>
 
 <template>
   <SiteHeader>
-    <AppBotao :to="{ name: 'home' }" variante="texto">
+    <AppBotao :to="voltar ?? { name: 'home' }" variante="texto">
       <AppIcone nome="seta-esquerda" :tamanho="18" espessura="2.2" />
       Voltar
     </AppBotao>
@@ -37,10 +99,23 @@ function criarConta() {
     <div class="coluna">
       <div class="introducao">
         <h1 class="titulo">Área do cliente</h1>
-        <p>Veja, cancele ou remarque seus agendamentos.</p>
+        <p v-if="voltar">Entre ou crie sua conta para confirmar o agendamento.</p>
+        <p v-else>Veja, cancele ou remarque seus agendamentos.</p>
       </div>
 
-      <div class="cartao">
+      <div v-if="cliente.logado && !voltar" class="cartao conectado">
+        <AppIcone nome="usuario" :tamanho="32" class="conectado__icone" />
+        <p>
+          Você entrou como <strong>{{ cliente.clienteNome }}</strong>
+          ({{ formatarTelefone(cliente.clienteTelefone) }}).
+        </p>
+        <AppBotao variante="contorno" @click="cliente.sair()">
+          <AppIcone nome="sair" :tamanho="18" />
+          Sair
+        </AppBotao>
+      </div>
+
+      <div v-else class="cartao">
         <div role="tablist" aria-label="Entrar ou criar conta" class="abas">
           <button
             id="aba-entrar"
@@ -65,6 +140,8 @@ function criarConta() {
             Criar conta
           </button>
         </div>
+
+        <AppAviso v-if="erro" tipo="erro">{{ erro }}</AppAviso>
 
         <form
           v-if="aba === 'entrar'"
@@ -91,7 +168,9 @@ function criarConta() {
             autocomplete="current-password"
             required
           />
-          <AppBotao tipo="submit" tamanho="g" bloco>Entrar</AppBotao>
+          <AppBotao tipo="submit" tamanho="g" bloco :desabilitado="enviando">
+            {{ enviando ? 'Entrando…' : 'Entrar' }}
+          </AppBotao>
           <p class="troca">
             Ainda não tem conta?
             <button type="button" class="troca__botao" @click="aba = 'criar'">Criar conta</button>
@@ -122,6 +201,7 @@ function criarConta() {
             placeholder="(19) 98888-7777"
             dica="É para ele que enviamos o lembrete por SMS."
             autocomplete="tel"
+            :erro="erroTelefone"
             required
           />
           <CampoFormulario
@@ -143,7 +223,9 @@ function criarConta() {
             minlength="8"
             required
           />
-          <AppBotao tipo="submit" tamanho="g" bloco>Criar conta</AppBotao>
+          <AppBotao tipo="submit" tamanho="g" bloco :desabilitado="enviando">
+            {{ enviando ? 'Criando conta…' : 'Criar conta' }}
+          </AppBotao>
           <p class="troca">
             Já tem conta?
             <button type="button" class="troca__botao" @click="aba = 'entrar'">Entrar</button>
@@ -151,7 +233,7 @@ function criarConta() {
         </form>
       </div>
 
-      <AppAviso tipo="info">
+      <AppAviso v-if="!voltar" tipo="info">
         Para marcar um horário novo, abra o link que o profissional te enviou. Se você ainda não
         estiver logado, pedimos o login na hora de confirmar.
       </AppAviso>
@@ -203,6 +285,19 @@ function criarConta() {
   display: flex;
   flex-direction: column;
   gap: 22px;
+}
+
+.conectado {
+  align-items: center;
+  text-align: center;
+}
+
+.conectado p {
+  margin: 0;
+}
+
+.conectado__icone {
+  color: var(--cor-destaque);
 }
 
 /* Abas */

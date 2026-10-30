@@ -31,6 +31,7 @@ Login de teste (criado pelo `db/dados-dev.sql` do Backend 1): **ana@exemplo.com 
 | História | Tela | Contratos |
 |---|---|---|
 | H02.3 | Login do profissional (`/profissional/entrar`) e Meus serviços (`/profissional/servicos`) | CT1, CT2, CT3 |
+| H04.2 | Link do profissional (`/p/{profissionalSlug}`): serviço, dia, horário livre, nome e celular, revisão e confirmação | CT3, CT5, CT7 |
 
 O token do CT1 é um JWT com `exp`: quando ele vence, a tela volta sozinha ao login.
 

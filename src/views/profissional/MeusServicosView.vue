@@ -9,6 +9,7 @@ import AppIcone from '@/components/AppIcone.vue'
 import CampoFormulario from '@/components/CampoFormulario.vue'
 import SiteHeader from '@/components/SiteHeader.vue'
 import { useSessaoStore } from '@/stores/sessao'
+import { formatarDuracao, formatarPreco } from '@/utils/formatos'
 
 // Limites do CT2 cadastrarServico (ficha + colunas do CT15 no Backend 1).
 const DURACAO_MIN = 15
@@ -31,19 +32,6 @@ const errosCampos = reactive({ servicoNome: '', duracaoMinutos: '', preco: '' })
 const erroFormulario = ref('')
 const sucesso = ref('')
 const enviando = ref(false)
-
-const formatoPreco = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-
-function formatarPreco(preco) {
-  return formatoPreco.format(Number(preco))
-}
-
-function formatarDuracao(minutos) {
-  const horas = Math.floor(minutos / 60)
-  const resto = minutos % 60
-  if (!horas) return `${resto} min`
-  return resto ? `${horas} h ${resto} min` : `${horas} h`
-}
 
 // Aceita "35", "35,5", "35,50" e "35.50".
 function lerPreco(texto) {

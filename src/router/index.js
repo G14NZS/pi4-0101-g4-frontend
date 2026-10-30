@@ -28,6 +28,13 @@ const routes = [
     component: () => import('@/views/cliente/EntrarClienteView.vue'),
     meta: { titulo: 'Área do cliente' },
   },
+  {
+    // Link do profissional (E4): aberto sem login, por exemplo /p/ana-unhas.
+    path: '/p/:profissionalSlug',
+    name: 'agendar',
+    component: () => import('@/views/cliente/AgendarView.vue'),
+    meta: { titulo: 'Agendar horário' },
+  },
 ]
 
 const router = createRouter({
