@@ -1,0 +1,9 @@
+# pack-refs with: peeled fully-peeled sorted 
+a75a51b87946d6af13a38a1488f352a05dd36f6b refs/heads/develop
+96e3a8859f3d083d07fc5910bf7f257697abb4d9 refs/heads/feat/h03.1-definirHorarios
+2e22ed07d56f6c7df244cb065c13d7cd10c92c1c refs/heads/feature/h02-sessao-servicos
+34e91914c862b1119e8a0ab8e8030a1c285881b1 refs/heads/feature/h04-criar-agendamento
+5c8982adcd26edaad79073d85796ff599314897d refs/heads/main
+2e22ed07d56f6c7df244cb065c13d7cd10c92c1c refs/pull/1/head
+24cf106c71f1e26a32d9f023571c2b4f3a6654c4 refs/pull/1/merge
+34e91914c862b1119e8a0ab8e8030a1c285881b1 refs/pull/2/head
