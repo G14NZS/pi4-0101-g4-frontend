@@ -21,6 +21,12 @@ const routes = [
     component: () => import('@/views/cliente/EntrarClienteView.vue'),
     meta: { titulo: 'Área do cliente' },
   },
+  {
+    path: '/profissional/horarios',
+    name: 'meus-horarios',
+    component: () => import('@/views/profissional/MeusHorariosView.vue'),
+    meta: { titulo: 'Meus horários' },
+  },
 ]
 
 const router = createRouter({
