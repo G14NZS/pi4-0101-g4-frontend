@@ -32,7 +32,7 @@ function destinoDepoisDoLogin() {
   if (typeof voltar === 'string' && voltar.startsWith('/') && !voltar.startsWith('//')) {
     return voltar
   }
-  return { name: 'meus-servicos' }
+  return { name: 'agenda-do-dia' }
 }
 
 async function entrar() {

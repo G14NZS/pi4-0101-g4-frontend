@@ -1,12 +1,12 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
 
 import { cadastrarServico, listarServicos } from '@/api/servicos'
 import AppAviso from '@/components/AppAviso.vue'
 import AppBotao from '@/components/AppBotao.vue'
 import AppIcone from '@/components/AppIcone.vue'
 import CampoFormulario from '@/components/CampoFormulario.vue'
+import NavProfissional from '@/components/NavProfissional.vue'
 import SiteHeader from '@/components/SiteHeader.vue'
 import { useSessaoStore } from '@/stores/sessao'
 import { formatarDuracao, formatarPreco } from '@/utils/formatos'
@@ -17,7 +17,6 @@ const DURACAO_MAX = 480
 const NOME_MAX = 100
 const PRECO_MAX = 99999999.99
 
-const router = useRouter()
 const sessao = useSessaoStore()
 
 // Lista (CT3 listarServicos)
@@ -107,26 +106,12 @@ async function cadastrar() {
   }
 }
 
-function sair() {
-  sessao.sair()
-  router.push({ name: 'entrar-profissional' })
-}
-
 onMounted(carregarServicos)
 </script>
 
 <template>
   <SiteHeader>
-    <div class="usuario">
-      <span class="usuario__nome">
-        <AppIcone nome="usuario" :tamanho="18" />
-        {{ sessao.profissionalNome }}
-      </span>
-      <AppBotao variante="texto" @click="sair">
-        <AppIcone nome="sair" :tamanho="18" />
-        Sair
-      </AppBotao>
-    </div>
+    <NavProfissional />
   </SiteHeader>
 
   <main class="conteudo pagina">
@@ -226,20 +211,6 @@ onMounted(carregarServicos)
 </template>
 
 <style scoped>
-.usuario {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.usuario__nome {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  color: var(--cor-texto-suave);
-}
-
 .pagina {
   padding-top: 16px;
   padding-bottom: 80px;
@@ -402,10 +373,6 @@ onMounted(carregarServicos)
 
   .formulario__linha {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .usuario__nome {
-    display: none;
   }
 }
 </style>

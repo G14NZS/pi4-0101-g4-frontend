@@ -20,3 +20,10 @@ export async function criarAgendamento({ servicoId, inicio, clienteTelefone, cli
   })
   return data
 }
+
+// CT11 listarAgendamentosDoDia: devolve { data, agendamentos }, só os confirmados do
+// profissional do token (enviado pelo interceptor do http.js), em ordem de horário.
+export async function listarAgendamentosDoDia(data) {
+  const { data: resposta } = await http.get('/agendamentos', { params: { data } })
+  return resposta
+}

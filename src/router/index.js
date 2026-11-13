@@ -17,6 +17,13 @@ const routes = [
     meta: { titulo: 'Entrar como profissional' },
   },
   {
+    // E8: tela inicial do profissional depois do login.
+    path: '/profissional/agenda',
+    name: 'agenda-do-dia',
+    component: () => import('@/views/profissional/AgendaDoDiaView.vue'),
+    meta: { titulo: 'Agenda do dia', requerLogin: true },
+  },
+  {
     path: '/profissional/servicos',
     name: 'meus-servicos',
     component: () => import('@/views/profissional/MeusServicosView.vue'),
@@ -58,7 +65,7 @@ router.beforeEach((to) => {
 
   // Já logado não precisa ver o login de novo.
   if (to.name === 'entrar-profissional' && sessao.tokenValido()) {
-    return { name: 'meus-servicos' }
+    return { name: 'agenda-do-dia' }
   }
 })
 
