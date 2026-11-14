@@ -25,6 +25,9 @@ const ICONES = {
   },
   alerta: { circles: [{ cx: 12, cy: 12, r: 9 }], paths: ['M12 8v5M12 16h.01'] },
   info: { circles: [{ cx: 12, cy: 12, r: 9 }], paths: ['M12 11v5M12 8h.01'] },
+  mais: { paths: ['M12 5v14M5 12h14'] },
+  sair: { paths: ['M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3', 'M10 17l-5-5 5-5M5 12h11'] },
+  check: { circles: [{ cx: 12, cy: 12, r: 9 }], paths: ['M8 12l3 3 5-6'] },
 }
 
 const icone = computed(() => ICONES[props.nome] ?? {})

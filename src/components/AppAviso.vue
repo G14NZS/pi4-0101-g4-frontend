@@ -2,14 +2,17 @@
 import AppIcone from './AppIcone.vue'
 
 defineProps({
-  // erro | info
+  // erro | info | sucesso
   tipo: { type: String, default: 'info' },
 })
+
+const ICONES = { erro: 'alerta', info: 'info', sucesso: 'check' }
+const PAPEIS = { erro: 'alert', sucesso: 'status' }
 </script>
 
 <template>
-  <div :role="tipo === 'erro' ? 'alert' : undefined" :class="['aviso', `aviso--${tipo}`]">
-    <AppIcone :nome="tipo === 'erro' ? 'alerta' : 'info'" class="aviso__icone" />
+  <div :role="PAPEIS[tipo]" :class="['aviso', `aviso--${tipo}`]">
+    <AppIcone :nome="ICONES[tipo] ?? 'info'" class="aviso__icone" />
     <span><slot /></span>
   </div>
 </template>
@@ -39,5 +42,13 @@ defineProps({
   background: var(--cor-destaque-claro);
   border-radius: 16px;
   color: var(--cor-aviso-texto);
+}
+
+.aviso--sucesso {
+  padding: 14px 16px;
+  background: var(--cor-destaque-claro);
+  border-radius: 12px;
+  color: var(--cor-destaque-hover);
+  font-weight: 600;
 }
 </style>

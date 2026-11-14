@@ -1,15 +1,26 @@
 <script setup>
+import { computed } from 'vue'
+
 defineOptions({ inheritAttrs: false })
 
-const modelo = defineModel({ type: String, default: '' })
+// <input type="number"> devolve número pelo v-model.
+const modelo = defineModel({ type: [String, Number], default: '' })
 
-defineProps({
+const props = defineProps({
   id: { type: String, required: true },
   rotulo: { type: String, required: true },
   tipo: { type: String, default: 'text' },
   placeholder: { type: String, default: '' },
   dica: { type: String, default: '' },
+  erro: { type: String, default: '' },
 })
+
+const descritoPor = computed(
+  () =>
+    [props.erro && `${props.id}-erro`, props.dica && `${props.id}-dica`]
+      .filter(Boolean)
+      .join(' ') || undefined,
+)
 </script>
 
 <!-- Atributos extras (required, autocomplete, minlength...) vão direto para o <input>. -->
@@ -21,10 +32,12 @@ defineProps({
       v-model="modelo"
       :type="tipo"
       :placeholder="placeholder"
-      :aria-describedby="dica ? `${id}-dica` : undefined"
-      class="campo__entrada"
+      :aria-describedby="descritoPor"
+      :aria-invalid="erro ? 'true' : undefined"
+      :class="['campo__entrada', { 'campo__entrada--erro': erro }]"
       v-bind="$attrs"
     />
+    <span v-if="erro" :id="`${id}-erro`" class="campo__erro">{{ erro }}</span>
     <span v-if="dica" :id="`${id}-dica`" class="campo__dica">{{ dica }}</span>
   </div>
 </template>
@@ -55,6 +68,16 @@ defineProps({
 .campo__entrada:focus-visible {
   border-color: var(--cor-destaque);
   outline-offset: 0;
+}
+
+.campo__entrada--erro {
+  border-color: var(--cor-erro-texto);
+}
+
+.campo__erro {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cor-erro-texto);
 }
 
 .campo__dica {
