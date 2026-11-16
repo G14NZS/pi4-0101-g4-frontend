@@ -42,6 +42,13 @@ const routes = [
     component: () => import('@/views/cliente/AgendarView.vue'),
     meta: { titulo: 'Agendar horário' },
   },
+  {
+    // E7: aberta pelo link do profissional, sem login; o cliente se identifica pelo celular.
+    path: '/p/:profissionalSlug/meus-agendamentos',
+    name: 'meus-agendamentos',
+    component: () => import('@/views/cliente/MeusAgendamentosView.vue'),
+    meta: { titulo: 'Meus agendamentos' },
+  },
 ]
 
 const router = createRouter({

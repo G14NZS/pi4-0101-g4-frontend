@@ -1,4 +1,4 @@
-// Mensagens dos códigos de erro das fichas de contrato (CT1 a CT3, CT5 e CT7).
+// Mensagens dos códigos de erro das fichas de contrato (CT1 a CT3, CT5, CT7 a CT9).
 // O Backend 1 já manda `mensagem`; estas só entram quando ela não vier.
 export const MENSAGENS_DE_ERRO = {
   DADOS_INVALIDOS: 'Confira os dados preenchidos e tente de novo.',
@@ -11,6 +11,10 @@ export const MENSAGENS_DE_ERRO = {
   TELEFONE_INVALIDO: 'Informe um celular com DDD, por exemplo (19) 98888-7777.',
   NOME_OBRIGATORIO: 'Informe o seu nome.',
   HORARIO_INDISPONIVEL: 'Esse horário acabou de ser ocupado. Escolha outro.',
+  CLIENTE_NAO_ENCONTRADO: 'Não encontramos agendamentos para esse celular.',
+  AGENDAMENTO_NAO_ENCONTRADO: 'Não encontramos esse agendamento para o seu celular.',
+  AGENDAMENTO_JA_CANCELADO: 'Esse agendamento já foi cancelado.',
+  AGENDAMENTO_JA_PASSOU: 'O horário desse agendamento já passou e ele não pode mais ser cancelado.',
   ERRO_DE_REDE: 'Não foi possível falar com o servidor.',
 }
 
