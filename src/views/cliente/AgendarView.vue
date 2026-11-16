@@ -277,15 +277,25 @@ function sairCliente() {
 
 <template>
   <SiteHeader>
-    <div v-if="cliente.logado" class="usuario">
-      <span class="usuario__nome">
-        <AppIcone nome="usuario" :tamanho="18" />
-        {{ cliente.clienteNome }}
-      </span>
-      <AppBotao variante="texto" @click="sairCliente">
-        <AppIcone nome="sair" :tamanho="18" />
-        Sair
+    <div class="usuario">
+      <AppBotao
+        v-if="!naoEncontrado"
+        :to="{ name: 'meus-agendamentos', params: { profissionalSlug: slug } }"
+        variante="texto"
+      >
+        <AppIcone nome="calendario" :tamanho="18" />
+        Meus agendamentos
       </AppBotao>
+      <template v-if="cliente.logado">
+        <span class="usuario__nome">
+          <AppIcone nome="usuario" :tamanho="18" />
+          {{ cliente.clienteNome }}
+        </span>
+        <AppBotao variante="texto" @click="sairCliente">
+          <AppIcone nome="sair" :tamanho="18" />
+          Sair
+        </AppBotao>
+      </template>
     </div>
   </SiteHeader>
 
@@ -583,6 +593,13 @@ function sairCliente() {
         <AppBotao variante="contorno" tamanho="g" bloco @click="agendarOutro">
           Agendar outro horário
         </AppBotao>
+        <AppBotao
+          :to="{ name: 'meus-agendamentos', params: { profissionalSlug: slug } }"
+          variante="texto"
+          bloco
+        >
+          Ver ou cancelar meus agendamentos
+        </AppBotao>
       </div>
     </div>
   </main>
@@ -592,6 +609,7 @@ function sairCliente() {
 .usuario {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 

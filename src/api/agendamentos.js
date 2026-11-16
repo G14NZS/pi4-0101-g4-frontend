@@ -27,3 +27,20 @@ export async function listarAgendamentosDoDia(data) {
   const { data: resposta } = await http.get('/agendamentos', { params: { data } })
   return resposta
 }
+
+// CT8 listarAgendamentosDoCliente: devolve { agendamentos }, só os futuros e confirmados do
+// cliente desse telefone, em ordem de início. Sem login. O axios codifica o "+" como %2B.
+export async function listarAgendamentosDoCliente(clienteTelefone) {
+  const { data } = await http.get('/agendamentos/do-cliente', { params: { clienteTelefone } })
+  return data
+}
+
+// CT9 cancelarAgendamento: devolve { agendamentoId, status, atualizadoEm }. Sem login;
+// o `clienteTelefone` precisa ser o do agendamento.
+export async function cancelarAgendamento(agendamentoId, clienteTelefone) {
+  const { data } = await http.patch(
+    `/agendamentos/${encodeURIComponent(agendamentoId)}/cancelamento`,
+    { clienteTelefone },
+  )
+  return data
+}
