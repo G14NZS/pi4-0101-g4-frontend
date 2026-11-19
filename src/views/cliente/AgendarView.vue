@@ -204,26 +204,34 @@ async function horarioPerdido(mensagem) {
 }
 
 async function confirmar() {
-  if (!cliente.logado) return
+  if (!cliente.logado) {
+    pedirLogin('entrar')
+    return
+  }
+
   erroConfirmar.value = ''
   enviando.value = true
+
   try {
-    const clienteNome = dados.clienteNome.trim()
-    const clienteTelefone = normalizarTelefone(dados.clienteTelefone)
     agendamento.value = await criarAgendamento({
       servicoId: servicoId.value,
       inicio: inicio.value,
-      clienteTelefone,
-      clienteNome,
+      token: cliente.token,
     })
-    cliente.atualizarDados({ clienteNome, clienteTelefone })
+
     irPara('confirmado')
   } catch (e) {
-    if (e.erro === 'HORARIO_INDISPONIVEL' || e.erro === 'DATA_INVALIDA') {
+    if (e.erro === 'NAO_AUTENTICADO') {
+      cliente.sair()
+      pedirLogin('entrar')
+      return
+    }
+
+    if (
+      e.erro === 'HORARIO_INDISPONIVEL'
+      || e.erro === 'DATA_INVALIDA'
+    ) {
       await horarioPerdido(MENSAGEM_INDISPONIVEL)
-    } else if (e.erro === 'TELEFONE_INVALIDO' || e.erro === 'NOME_OBRIGATORIO') {
-      irPara('escolha')
-      errosCampos[e.erro === 'TELEFONE_INVALIDO' ? 'clienteTelefone' : 'clienteNome'] = e.mensagem
     } else {
       erroConfirmar.value = e.mensagem
     }

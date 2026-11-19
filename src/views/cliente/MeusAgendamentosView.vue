@@ -1,100 +1,66 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
-import { cancelarAgendamento, listarAgendamentosDoCliente } from '@/api/agendamentos'
-import { MENSAGENS_DE_ERRO } from '@/api/erros'
+import {
+  cancelarAgendamento,
+  listarAgendamentosDoCliente,
+} from '@/api/agendamentos'
 import AppAviso from '@/components/AppAviso.vue'
 import AppBotao from '@/components/AppBotao.vue'
 import AppIcone from '@/components/AppIcone.vue'
-import CampoFormulario from '@/components/CampoFormulario.vue'
 import SiteHeader from '@/components/SiteHeader.vue'
 import { useClienteStore } from '@/stores/cliente'
 import {
   formatarDiaLongo,
   formatarHora,
-  formatarTelefone,
-  normalizarTelefone,
   partesDoDia,
 } from '@/utils/formatos'
 
-// E7 Meus agendamentos, aberta pelo link do profissional (/p/{slug}/meus-agendamentos), sem login:
-// o cliente informa o celular, vê os agendamentos futuros (CT8) e cancela (CT9).
-// A lista só muda depois que o Backend 1 confirma o cancelamento; numa recusa ela fica como estava.
 const route = useRoute()
 const cliente = useClienteStore()
-const slug = computed(() => route.params.profissionalSlug)
 
-// Celular: vem preenchido com o da conta do cliente neste navegador, se houver.
-const telefoneDigitado = ref(cliente.clienteTelefone ? formatarTelefone(cliente.clienteTelefone) : '')
-const erroTelefone = ref('')
-// Celular (já +55...) da lista mostrada; é o mesmo usado para cancelar.
-const telefoneConsultado = ref(null)
+const slug = computed(
+  () => route.params.profissionalSlug,
+)
 
-// Lista (CT8 listarAgendamentosDoCliente)
 const agendamentos = ref([])
 const carregando = ref(false)
 const erroLista = ref('')
-const semCadastro = ref(false)
-let consultaAtual = 0
 
-// Cancelamento (CT9 cancelarAgendamento)
 const confirmandoId = ref(null)
 const cancelandoId = ref(null)
-// Recusa do CT9, mostrada no próprio agendamento: { agendamentoId, mensagem }.
 const recusa = ref(null)
 const sucesso = ref('')
 const avisoSucesso = ref(null)
 
-const consultou = computed(() => telefoneConsultado.value !== null)
+async function carregar() {
+  if (!cliente.logado) return
 
-async function consultar() {
-  erroTelefone.value = ''
-  const telefone = normalizarTelefone(telefoneDigitado.value)
-  if (!telefone) {
-    erroTelefone.value = MENSAGENS_DE_ERRO.TELEFONE_INVALIDO
-    return
-  }
-  sucesso.value = ''
-  await carregar(telefone)
-}
-
-async function carregar(telefone) {
-  const numero = ++consultaAtual
   carregando.value = true
   erroLista.value = ''
-  semCadastro.value = false
   recusa.value = null
-  confirmandoId.value = null
+
   try {
-    const resposta = await listarAgendamentosDoCliente(telefone)
-    if (numero !== consultaAtual) return
-    agendamentos.value = resposta.agendamentos
-    telefoneConsultado.value = telefone
+    const resposta =
+      await listarAgendamentosDoCliente(
+        cliente.token,
+      )
+
+    agendamentos.value =
+      resposta.agendamentos
+
   } catch (e) {
-    if (numero !== consultaAtual) return
-    if (e.erro === 'TELEFONE_INVALIDO') {
-      erroTelefone.value = e.mensagem
-    } else if (e.erro === 'CLIENTE_NAO_ENCONTRADO') {
-      semCadastro.value = true
+    if (e.erro === 'NAO_AUTENTICADO') {
+      cliente.sair()
+      erroLista.value =
+        'Sua sessão expirou. Entre novamente.'
     } else {
       erroLista.value = e.mensagem
     }
   } finally {
-    if (numero === consultaAtual) carregando.value = false
+    carregando.value = false
   }
-}
-
-function trocarTelefone() {
-  ++consultaAtual
-  telefoneConsultado.value = null
-  agendamentos.value = []
-  carregando.value = false
-  erroLista.value = ''
-  semCadastro.value = false
-  recusa.value = null
-  confirmandoId.value = null
-  sucesso.value = ''
 }
 
 function pedirConfirmacao(id) {
@@ -109,163 +75,344 @@ function desistir() {
 
 async function cancelar(agendamento) {
   const id = agendamento.agendamentoId
+
   cancelandoId.value = id
   recusa.value = null
+
   try {
-    await cancelarAgendamento(id, telefoneConsultado.value)
+    await cancelarAgendamento(
+      id,
+      cliente.token,
+    )
+
   } catch (e) {
-    // Recusa (AGENDAMENTO_NAO_ENCONTRADO, _JA_CANCELADO, _JA_PASSOU ou falha de rede):
-    // a lista não muda, só mostra o motivo no próprio agendamento.
-    recusa.value = { agendamentoId: id, mensagem: e.mensagem }
+    if (e.erro === 'NAO_AUTENTICADO') {
+      cliente.sair()
+      erroLista.value =
+        'Sua sessão expirou. Entre novamente.'
+    } else {
+      recusa.value = {
+        agendamentoId: id,
+        mensagem: e.mensagem,
+      }
+    }
+
     confirmandoId.value = null
     cancelandoId.value = null
     return
   }
 
-  // Sucesso: só agora a lista é atualizada, consultando o CT8 de novo.
-  const descricao = `${agendamento.servicoNome} de ${formatarDiaLongo(agendamento.inicio).toLowerCase()}, às ${formatarHora(agendamento.inicio)}`
+  const descricao =
+    `${agendamento.servicoNome} de ` +
+    `${formatarDiaLongo(agendamento.inicio).toLowerCase()}, ` +
+    `às ${formatarHora(agendamento.inicio)}`
+
   try {
-    const resposta = await listarAgendamentosDoCliente(telefoneConsultado.value)
-    agendamentos.value = resposta.agendamentos
+    const resposta =
+      await listarAgendamentosDoCliente(
+        cliente.token,
+      )
+
+    agendamentos.value =
+      resposta.agendamentos
+
   } catch {
-    // O cancelamento já foi gravado; se a nova consulta falhar, tira o item da lista mostrada.
-    agendamentos.value = agendamentos.value.filter((a) => a.agendamentoId !== id)
+    agendamentos.value =
+      agendamentos.value.filter(
+        (a) => a.agendamentoId !== id,
+      )
   }
+
   confirmandoId.value = null
   cancelandoId.value = null
-  sucesso.value = `Cancelamos o agendamento ${descricao}. O horário ficou livre para outras pessoas.`
+
+  sucesso.value =
+    `Cancelamos o agendamento ${descricao}. ` +
+    'O horário ficou livre para outras pessoas.'
+
   await nextTick()
   avisoSucesso.value?.focus()
 }
+
+onMounted(() => {
+  if (cliente.logado) {
+    carregar()
+  }
+})
 </script>
 
 <template>
   <SiteHeader>
-    <AppBotao :to="{ name: 'agendar', params: { profissionalSlug: slug } }" variante="texto">
-      <AppIcone nome="seta-esquerda" :tamanho="18" espessura="2.2" />
+    <AppBotao
+      :to="{
+        name: 'agendar',
+        params: { profissionalSlug: slug },
+      }"
+      variante="texto"
+    >
+      <AppIcone
+        nome="seta-esquerda"
+        :tamanho="18"
+        espessura="2.2"
+      />
       Agendar horário
     </AppBotao>
   </SiteHeader>
 
   <main class="conteudo pagina">
     <div class="coluna">
+
       <div class="introducao">
-        <p class="sobretitulo">Área do cliente</p>
-        <h1 class="titulo">Meus agendamentos</h1>
-        <p>Informe o celular usado no agendamento para ver e cancelar seus próximos horários.</p>
+        <p class="sobretitulo">
+          Área do cliente
+        </p>
+
+        <h1 class="titulo">
+          Meus agendamentos
+        </h1>
+
+        <p>
+          Consulte e cancele seus próximos
+          horários.
+        </p>
       </div>
 
-      <!-- Celular -->
-      <section v-if="!consultou" class="cartao" aria-labelledby="titulo-celular">
-        <h2 id="titulo-celular" class="cartao__titulo">Seu celular</h2>
-        <form class="formulario" novalidate @submit.prevent="consultar">
-          <CampoFormulario
-            id="meus-telefone"
-            v-model="telefoneDigitado"
-            rotulo="Celular"
-            tipo="tel"
-            placeholder="(19) 98888-7777"
-            dica="O mesmo número que você informou ao agendar."
-            autocomplete="tel"
-            :erro="erroTelefone"
-            required
-          />
-          <AppBotao tipo="submit" tamanho="g" bloco :desabilitado="carregando">
-            {{ carregando ? 'Buscando…' : 'Ver meus agendamentos' }}
-          </AppBotao>
-        </form>
+      <section
+        v-if="!cliente.logado"
+        class="cartao"
+      >
+        <AppAviso tipo="info">
+          Entre na sua conta para ver seus
+          agendamentos.
+        </AppAviso>
 
-        <div v-if="semCadastro" class="estado estado--vazio" role="status">
-          <AppIcone nome="calendario" :tamanho="28" class="estado__icone" />
-          <p>{{ MENSAGENS_DE_ERRO.CLIENTE_NAO_ENCONTRADO }} Confira o número ou faça seu primeiro agendamento.</p>
-          <AppBotao :to="{ name: 'agendar', params: { profissionalSlug: slug } }" variante="contorno">
-            Agendar horário
-          </AppBotao>
-        </div>
-
-        <div v-else-if="erroLista" class="falha">
-          <AppAviso tipo="erro">Não foi possível buscar seus agendamentos. {{ erroLista }}</AppAviso>
-        </div>
+        <AppBotao
+          :to="{
+            name: 'entrar-cliente',
+            query: {
+              voltar: route.fullPath,
+            },
+          }"
+          tamanho="g"
+          bloco
+        >
+          Entrar
+        </AppBotao>
       </section>
 
-      <!-- Lista (CT8) -->
-      <section v-else class="cartao" aria-labelledby="titulo-lista" :aria-busy="carregando">
+      <section
+        v-else
+        class="cartao"
+        aria-labelledby="titulo-lista"
+        :aria-busy="carregando"
+      >
         <div class="cabecalho-lista">
           <div>
-            <h2 id="titulo-lista" class="cartao__titulo">Próximos horários</h2>
-            <p class="celular">{{ formatarTelefone(telefoneConsultado) }}</p>
+            <h2
+              id="titulo-lista"
+              class="cartao__titulo"
+            >
+              Próximos horários
+            </h2>
+
+            <p class="celular">
+              {{ cliente.clienteNome }}
+            </p>
           </div>
-          <AppBotao variante="contorno" @click="trocarTelefone">Trocar celular</AppBotao>
-        </div>
 
-        <div v-if="sucesso" ref="avisoSucesso" tabindex="-1" class="sucesso">
-          <AppAviso tipo="sucesso">{{ sucesso }}</AppAviso>
-        </div>
-
-        <div v-if="!agendamentos.length" class="estado estado--vazio">
-          <AppIcone nome="calendario" :tamanho="28" class="estado__icone" />
-          <p>Você não tem agendamentos futuros.</p>
-          <AppBotao :to="{ name: 'agendar', params: { profissionalSlug: slug } }" variante="contorno">
-            Agendar horário
+          <AppBotao
+            variante="contorno"
+            @click="carregar"
+          >
+            Atualizar
           </AppBotao>
         </div>
 
-        <ol v-else class="lista">
-          <li v-for="a in agendamentos" :key="a.agendamentoId" class="item">
-            <div class="item__principal">
-              <div class="item__dia" aria-hidden="true">
-                <span class="item__semana">{{ partesDoDia(a.inicio).semana }}</span>
-                <span class="item__numero">{{ partesDoDia(a.inicio).dia }}</span>
-                <span class="item__mes">{{ partesDoDia(a.inicio).mes }}</span>
-              </div>
-              <div class="item__detalhes">
-                <div class="item__servico">{{ a.servicoNome }}</div>
-                <div class="item__quando">
-                  {{ formatarDiaLongo(a.inicio) }},
-                  <span class="item__horas">
-                    <time :datetime="a.inicio">{{ formatarHora(a.inicio) }}</time>
-                    às <time :datetime="a.fim">{{ formatarHora(a.fim) }}</time>
+        <p
+          v-if="carregando"
+          class="estado"
+        >
+          Buscando seus agendamentos…
+        </p>
+
+        <AppAviso
+          v-else-if="erroLista"
+          tipo="erro"
+        >
+          {{ erroLista }}
+        </AppAviso>
+
+        <template v-else>
+          <div
+            v-if="sucesso"
+            ref="avisoSucesso"
+            tabindex="-1"
+            class="sucesso"
+          >
+            <AppAviso tipo="sucesso">
+              {{ sucesso }}
+            </AppAviso>
+          </div>
+
+          <div
+            v-if="!agendamentos.length"
+            class="estado estado--vazio"
+          >
+            <AppIcone
+              nome="calendario"
+              :tamanho="28"
+              class="estado__icone"
+            />
+
+            <p>
+              Você não tem agendamentos futuros.
+            </p>
+
+            <AppBotao
+              :to="{
+                name: 'agendar',
+                params: {
+                  profissionalSlug: slug,
+                },
+              }"
+              variante="contorno"
+            >
+              Agendar horário
+            </AppBotao>
+          </div>
+
+          <ol
+            v-else
+            class="lista"
+          >
+            <li
+              v-for="a in agendamentos"
+              :key="a.agendamentoId"
+              class="item"
+            >
+              <div class="item__principal">
+
+                <div
+                  class="item__dia"
+                  aria-hidden="true"
+                >
+                  <span class="item__semana">
+                    {{ partesDoDia(a.inicio).semana }}
+                  </span>
+
+                  <span class="item__numero">
+                    {{ partesDoDia(a.inicio).dia }}
+                  </span>
+
+                  <span class="item__mes">
+                    {{ partesDoDia(a.inicio).mes }}
                   </span>
                 </div>
-                <div class="item__profissional">com {{ a.profissionalNome }}</div>
-              </div>
-              <AppBotao
-                v-if="confirmandoId !== a.agendamentoId"
-                variante="contorno"
-                class="item__cancelar"
-                :desabilitado="cancelandoId !== null"
-                @click="pedirConfirmacao(a.agendamentoId)"
-              >
-                Cancelar
-              </AppBotao>
-            </div>
 
-            <div
-              v-if="confirmandoId === a.agendamentoId"
-              class="confirmacao"
-              role="group"
-              :aria-label="`Confirmar cancelamento de ${a.servicoNome}`"
-            >
-              <p>Cancelar este agendamento? O horário fica livre para outras pessoas.</p>
-              <div class="confirmacao__botoes">
-                <AppBotao :desabilitado="cancelandoId === a.agendamentoId" @click="cancelar(a)">
-                  {{ cancelandoId === a.agendamentoId ? 'Cancelando…' : 'Sim, cancelar' }}
-                </AppBotao>
+                <div class="item__detalhes">
+                  <div class="item__servico">
+                    {{ a.servicoNome }}
+                  </div>
+
+                  <div class="item__quando">
+                    {{ formatarDiaLongo(a.inicio) }},
+
+                    <span class="item__horas">
+                      <time :datetime="a.inicio">
+                        {{ formatarHora(a.inicio) }}
+                      </time>
+
+                      às
+
+                      <time :datetime="a.fim">
+                        {{ formatarHora(a.fim) }}
+                      </time>
+                    </span>
+                  </div>
+
+                  <div class="item__profissional">
+                    com {{ a.profissionalNome }}
+                  </div>
+                </div>
+
                 <AppBotao
-                  variante="texto"
-                  :desabilitado="cancelandoId === a.agendamentoId"
-                  @click="desistir"
+                  v-if="
+                    confirmandoId !==
+                    a.agendamentoId
+                  "
+                  variante="contorno"
+                  class="item__cancelar"
+                  :desabilitado="
+                    cancelandoId !== null
+                  "
+                  @click="
+                    pedirConfirmacao(
+                      a.agendamentoId,
+                    )
+                  "
                 >
-                  Manter
+                  Cancelar
                 </AppBotao>
               </div>
-            </div>
 
-            <AppAviso v-if="recusa?.agendamentoId === a.agendamentoId" tipo="erro">
-              {{ recusa.mensagem }}
-            </AppAviso>
-          </li>
-        </ol>
+              <div
+                v-if="
+                  confirmandoId ===
+                  a.agendamentoId
+                "
+                class="confirmacao"
+                role="group"
+                :aria-label="
+                  `Confirmar cancelamento de ${a.servicoNome}`
+                "
+              >
+                <p>
+                  Cancelar este agendamento?
+                  O horário fica livre para
+                  outras pessoas.
+                </p>
+
+                <div class="confirmacao__botoes">
+                  <AppBotao
+                    :desabilitado="
+                      cancelandoId ===
+                      a.agendamentoId
+                    "
+                    @click="cancelar(a)"
+                  >
+                    {{
+                      cancelandoId ===
+                      a.agendamentoId
+                        ? 'Cancelando…'
+                        : 'Sim, cancelar'
+                    }}
+                  </AppBotao>
+
+                  <AppBotao
+                    variante="texto"
+                    :desabilitado="
+                      cancelandoId ===
+                      a.agendamentoId
+                    "
+                    @click="desistir"
+                  >
+                    Manter
+                  </AppBotao>
+                </div>
+              </div>
+
+              <AppAviso
+                v-if="
+                  recusa?.agendamentoId ===
+                  a.agendamentoId
+                "
+                tipo="erro"
+              >
+                {{ recusa.mensagem }}
+              </AppAviso>
+            </li>
+          </ol>
+        </template>
       </section>
     </div>
   </main>

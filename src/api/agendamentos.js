@@ -11,13 +11,24 @@ export async function listarHorariosLivres(profissionalSlug, { servicoId, data }
 
 // CT7 criarAgendamento: devolve o agendamento confirmado. Sem login no Backend 1.
 // `clienteNome` só é obrigatório quando o telefone ainda não está cadastrado.
-export async function criarAgendamento({ servicoId, inicio, clienteTelefone, clienteNome }) {
-  const { data } = await http.post('/agendamentos', {
-    servicoId,
-    inicio,
-    clienteTelefone,
-    ...(clienteNome && { clienteNome }),
-  })
+export async function criarAgendamento({ servicoId, inicio, token }) {
+  const { data } = await http.post(
+    '/agendamentos',
+    {
+      servicoId,
+      inicio,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+
+      // Evita que http.js trate um 401 do cliente
+      // como sessão expirada do profissional.
+      sessaoCliente: true,
+    },
+  )
+
   return data
 }
 
@@ -30,17 +41,30 @@ export async function listarAgendamentosDoDia(data) {
 
 // CT8 listarAgendamentosDoCliente: devolve { agendamentos }, só os futuros e confirmados do
 // cliente desse telefone, em ordem de início. Sem login. O axios codifica o "+" como %2B.
-export async function listarAgendamentosDoCliente(clienteTelefone) {
-  const { data } = await http.get('/agendamentos/do-cliente', { params: { clienteTelefone } })
+export async function listarAgendamentosDoCliente(token) {
+  const { data } = await http.get(
+    '/agendamentos/do-cliente',
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      sessaoCliente: true,
+    },
+  )
+
   return data
 }
 
-// CT9 cancelarAgendamento: devolve { agendamentoId, status, atualizadoEm }. Sem login;
-// o `clienteTelefone` precisa ser o do agendamento.
-export async function cancelarAgendamento(agendamentoId, clienteTelefone) {
+export async function cancelarAgendamento(agendamentoId, token) {
   const { data } = await http.patch(
     `/agendamentos/${encodeURIComponent(agendamentoId)}/cancelamento`,
-    { clienteTelefone },
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      sessaoCliente: true,
+    },
   )
   return data
 }

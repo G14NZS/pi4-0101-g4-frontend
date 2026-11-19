@@ -29,11 +29,13 @@ const voltar = computed(() => {
 // Vindo do link do profissional, o nome e o celular já digitados entram no cadastro.
 const pendente = voltar.value ? lerPendente() : null
 
-const login = reactive({ email: '', senha: '' })
+const login = reactive({
+  telefone: '',
+  senha: '',
+})
 const cadastro = reactive({
   nome: pendente?.clienteNome ?? '',
   telefone: pendente?.clienteTelefone ?? '',
-  email: '',
   senha: '',
 })
 const erroTelefone = ref('')
@@ -50,9 +52,24 @@ function depoisDeEntrar() {
 
 async function entrar() {
   erro.value = ''
+
+  const telefone =
+    normalizarTelefone(login.telefone)
+
+  erroTelefone.value = telefone
+    ? ''
+    : 'Informe um celular com DDD, por exemplo (19) 98888-7777.'
+
+  if (!telefone) return
+
   enviando.value = true
+
   try {
-    await cliente.entrar({ email: login.email.trim(), senha: login.senha })
+    await cliente.entrar({
+      telefone,
+      senha: login.senha,
+    })
+
     depoisDeEntrar()
   } catch (e) {
     erro.value = e.mensagem
@@ -64,20 +81,25 @@ async function entrar() {
 
 async function criarConta() {
   erro.value = ''
-  const clienteTelefone = normalizarTelefone(cadastro.telefone)
-  erroTelefone.value = clienteTelefone
+
+  const telefone =
+    normalizarTelefone(cadastro.telefone)
+
+  erroTelefone.value = telefone
     ? ''
     : 'Informe um celular com DDD, por exemplo (19) 98888-7777.'
-  if (!clienteTelefone) return
+
+  if (!telefone) return
 
   enviando.value = true
+
   try {
     await cliente.criarConta({
-      clienteNome: cadastro.nome.trim(),
-      clienteTelefone,
-      email: cadastro.email.trim(),
+      nome: cadastro.nome.trim(),
+      telefone,
       senha: cadastro.senha,
     })
+
     depoisDeEntrar()
   } catch (e) {
     erro.value = e.mensagem
@@ -152,20 +174,13 @@ async function criarConta() {
           @submit.prevent="entrar"
         >
           <CampoFormulario
-            id="login-email"
-            v-model="login.email"
-            rotulo="E-mail"
-            tipo="email"
-            placeholder="voce@exemplo.com"
-            autocomplete="username"
-            required
-          />
-          <CampoFormulario
-            id="login-senha"
-            v-model="login.senha"
-            rotulo="Senha"
-            tipo="password"
-            autocomplete="current-password"
+            id="login-telefone"
+            v-model="login.telefone"
+            rotulo="Celular"
+            tipo="tel"
+            placeholder="(19) 98888-7777"
+            autocomplete="tel"
+            :erro="erroTelefone"
             required
           />
           <AppBotao tipo="submit" tamanho="g" bloco :desabilitado="enviando">

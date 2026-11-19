@@ -12,7 +12,11 @@ const http = axios.create({
 // Operações com login (CT2, CT4, CT11) levam `Authorization: Bearer {token}` do CT1.
 http.interceptors.request.use((config) => {
   const { token } = useSessaoStore()
-  if (token) config.headers.Authorization = `Bearer ${token}`
+
+  if (!config.headers.Authorization && token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
   return config
 })
 
@@ -25,13 +29,18 @@ http.interceptors.response.use(
     const erro = response?.data?.erro ?? (response ? 'ERRO_DESCONHECIDO' : 'ERRO_DE_REDE')
 
     // Token vencido ou inválido: encerra a sessão e volta para o login.
-    if (erro === 'NAO_AUTENTICADO') {
+    if (erro === 'NAO_AUTENTICADO' && !error.config?.sessaoCliente) {
       useSessaoStore().sair()
+
       const atual = router.currentRoute.value
+
       if (atual.name !== 'entrar-profissional') {
         router.push({
           name: 'entrar-profissional',
-          query: { expirou: '1', voltar: atual.fullPath },
+          query: {
+            expirou: '1',
+            voltar: atual.fullPath,
+          },
         })
       }
     }
