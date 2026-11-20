@@ -10,6 +10,7 @@ import SiteHeader from '@/components/SiteHeader.vue'
 import { useClienteStore } from '@/stores/cliente'
 import { lerPendente } from '@/utils/agendamentoPendente'
 import { formatarTelefone, normalizarTelefone } from '@/utils/formatos'
+import {confirmarRecuperacaoSenha, solicitarRecuperacaoSenha, } from '@/api/clientes'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,16 +30,22 @@ const voltar = computed(() => {
 // Vindo do link do profissional, o nome e o celular já digitados entram no cadastro.
 const pendente = voltar.value ? lerPendente() : null
 
-const login = reactive({ email: '', senha: '' })
+const login = reactive({
+  telefone: '',
+  senha: '',
+})
 const cadastro = reactive({
   nome: pendente?.clienteNome ?? '',
   telefone: pendente?.clienteTelefone ?? '',
-  email: '',
   senha: '',
 })
 const erroTelefone = ref('')
 const erro = ref('')
 const enviando = ref(false)
+const recuperacao = reactive({telefone: '', codigo: '', novaSenha: '',})
+
+const recuperacaoSolicitada = ref(false)
+const sucessoRecuperacao = ref('')
 
 watch(aba, () => {
   erro.value = ''
@@ -50,9 +57,24 @@ function depoisDeEntrar() {
 
 async function entrar() {
   erro.value = ''
+
+  const telefone =
+    normalizarTelefone(login.telefone)
+
+  erroTelefone.value = telefone
+    ? ''
+    : 'Informe um celular com DDD, por exemplo (19) 98888-7777.'
+
+  if (!telefone) return
+
   enviando.value = true
+
   try {
-    await cliente.entrar({ email: login.email.trim(), senha: login.senha })
+    await cliente.entrar({
+      telefone,
+      senha: login.senha,
+    })
+
     depoisDeEntrar()
   } catch (e) {
     erro.value = e.mensagem
@@ -64,26 +86,116 @@ async function entrar() {
 
 async function criarConta() {
   erro.value = ''
-  const clienteTelefone = normalizarTelefone(cadastro.telefone)
-  erroTelefone.value = clienteTelefone
+
+  const telefone =
+    normalizarTelefone(cadastro.telefone)
+
+  erroTelefone.value = telefone
     ? ''
     : 'Informe um celular com DDD, por exemplo (19) 98888-7777.'
-  if (!clienteTelefone) return
+
+  if (!telefone) return
 
   enviando.value = true
+
   try {
     await cliente.criarConta({
-      clienteNome: cadastro.nome.trim(),
-      clienteTelefone,
-      email: cadastro.email.trim(),
+      nome: cadastro.nome.trim(),
+      telefone,
       senha: cadastro.senha,
     })
+
     depoisDeEntrar()
   } catch (e) {
     erro.value = e.mensagem
   } finally {
     enviando.value = false
   }
+}
+
+async function solicitarRecuperacao() {
+  erro.value = ''
+  sucessoRecuperacao.value = ''
+
+  const telefone =
+    normalizarTelefone(recuperacao.telefone)
+
+  erroTelefone.value = telefone
+    ? ''
+    : 'Informe um celular com DDD, por exemplo (19) 98888-7777.'
+
+  if (!telefone) return
+
+  enviando.value = true
+
+  try {
+    await solicitarRecuperacaoSenha(telefone)
+
+    recuperacao.telefone = telefone
+    recuperacaoSolicitada.value = true
+
+  } catch (e) {
+    erro.value = e.mensagem
+  } finally {
+    enviando.value = false
+  }
+}
+
+async function confirmarRecuperacao() {
+  erro.value = ''
+  sucessoRecuperacao.value = ''
+
+  if (!recuperacao.codigo.trim()) {
+    erro.value = 'Informe o código recebido por SMS.'
+    return
+  }
+
+  if (!recuperacao.novaSenha) {
+    erro.value = 'Informe a nova senha.'
+    return
+  }
+
+  enviando.value = true
+
+  try {
+    await confirmarRecuperacaoSenha({
+      telefone: recuperacao.telefone,
+      codigo: recuperacao.codigo.trim(),
+      novaSenha: recuperacao.novaSenha,
+    })
+
+    sucessoRecuperacao.value =
+      'Senha alterada com sucesso. Agora você já pode entrar.'
+
+    login.telefone =
+      formatarTelefone(recuperacao.telefone)
+
+    login.senha = ''
+
+    recuperacao.codigo = ''
+    recuperacao.novaSenha = ''
+    recuperacaoSolicitada.value = false
+
+  } catch (e) {
+    erro.value = e.mensagem
+  } finally {
+    enviando.value = false
+  }
+}
+function abrirRecuperacao() {
+  aba.value = 'recuperar'
+  recuperacao.telefone = login.telefone
+  erro.value = ''
+}
+
+function reenviarCodigo() {
+  recuperacaoSolicitada.value = false
+  erro.value = ''
+}
+
+function voltarParaLogin() {
+  aba.value = 'entrar'
+  erro.value = ''
 }
 </script>
 
@@ -152,25 +264,25 @@ async function criarConta() {
           @submit.prevent="entrar"
         >
           <CampoFormulario
-            id="login-email"
-            v-model="login.email"
-            rotulo="E-mail"
-            tipo="email"
-            placeholder="voce@exemplo.com"
-            autocomplete="username"
-            required
-          />
-          <CampoFormulario
-            id="login-senha"
-            v-model="login.senha"
-            rotulo="Senha"
-            tipo="password"
-            autocomplete="current-password"
+            id="login-telefone"
+            v-model="login.telefone"
+            rotulo="Celular"
+            tipo="tel"
+            placeholder="(19) 98888-7777"
+            autocomplete="tel"
+            :erro="erroTelefone"
             required
           />
           <AppBotao tipo="submit" tamanho="g" bloco :desabilitado="enviando">
             {{ enviando ? 'Entrando…' : 'Entrar' }}
           </AppBotao>
+          <button
+            type="button"
+            class="troca__botao"
+            @click="abrirRecuperacao"
+          >
+            Esqueci minha senha
+          </button>
           <p class="troca">
             Ainda não tem conta?
             <button type="button" class="troca__botao" @click="aba = 'criar'">Criar conta</button>
@@ -178,7 +290,7 @@ async function criarConta() {
         </form>
 
         <form
-          v-else
+          v-else-if="aba === 'criar'">
           id="painel-criar"
           role="tabpanel"
           aria-labelledby="aba-criar"
@@ -229,6 +341,113 @@ async function criarConta() {
           <p class="troca">
             Já tem conta?
             <button type="button" class="troca__botao" @click="aba = 'entrar'">Entrar</button>
+          </p>
+        </form>
+        <form
+          v-else
+          class="formulario"
+          @submit.prevent="
+            recuperacaoSolicitada
+              ? confirmarRecuperacao()
+              : solicitarRecuperacao()
+          "
+        >
+          <template v-if="!recuperacaoSolicitada">
+            <p>
+              Informe o celular da sua conta.
+              Enviaremos um código para redefinir sua senha.
+            </p>
+
+            <CampoFormulario
+              id="recuperacao-telefone"
+              v-model="recuperacao.telefone"
+              rotulo="Celular"
+              tipo="tel"
+              placeholder="(19) 98888-7777"
+              autocomplete="tel"
+              :erro="erroTelefone"
+              required
+            />
+
+            <AppBotao
+              tipo="submit"
+              tamanho="g"
+              bloco
+              :desabilitado="enviando"
+            >
+              {{
+                enviando
+                  ? 'Enviando…'
+                  : 'Enviar código'
+              }}
+            </AppBotao>
+          </template>
+
+          <template v-else>
+            <AppAviso tipo="info">
+              Se esse celular estiver cadastrado,
+              enviaremos um código por SMS.
+            </AppAviso>
+
+            <CampoFormulario
+              id="recuperacao-codigo"
+              v-model="recuperacao.codigo"
+              rotulo="Código"
+              placeholder="123456"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              required
+            />
+
+            <CampoFormulario
+              id="recuperacao-nova-senha"
+              v-model="recuperacao.novaSenha"
+              rotulo="Nova senha"
+              tipo="password"
+              autocomplete="new-password"
+              minlength="8"
+              required
+            />
+
+            <AppBotao
+              tipo="submit"
+              tamanho="g"
+              bloco
+              :desabilitado="enviando"
+            >
+              {{
+                enviando
+                  ? 'Alterando…'
+                  : 'Alterar senha'
+              }}
+            </AppBotao>
+
+            <button
+              type="button"
+              class="troca__botao"
+              @click="reenviarCodigo"
+            >
+              Enviar outro código
+            </button>
+          </template>
+
+          <AppAviso
+            v-if="sucessoRecuperacao"
+            tipo="sucesso"
+          >
+            {{ sucessoRecuperacao }}
+          </AppAviso>
+
+          <p class="troca">
+            Lembrou a senha?
+
+            <button
+              type="button"
+              class="troca__botao"
+              @click="voltarParaLogin"
+            >
+              Voltar para entrar
+            </button>
           </p>
         </form>
       </div>
