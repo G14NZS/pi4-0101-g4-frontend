@@ -5,6 +5,8 @@ import { useRoute } from 'vue-router'
 import {
   cancelarAgendamento,
   listarAgendamentosDoCliente,
+  listarHorariosLivres,
+  remarcarAgendamento,
 } from '@/api/agendamentos'
 import AppAviso from '@/components/AppAviso.vue'
 import AppBotao from '@/components/AppBotao.vue'
@@ -14,8 +16,14 @@ import { useClienteStore } from '@/stores/cliente'
 import {
   formatarDiaLongo,
   formatarHora,
+  paraDataIso,
   partesDoDia,
 } from '@/utils/formatos'
+
+const DIAS_VISIVEIS = 21
+
+const MENSAGEM_INDISPONIVEL =
+  'Esse horário não está mais disponível. Atualizamos os horários livres para você escolher outro.'
 
 const route = useRoute()
 const cliente = useClienteStore()
@@ -24,15 +32,56 @@ const slug = computed(
   () => route.params.profissionalSlug,
 )
 
+// Lista
 const agendamentos = ref([])
 const carregando = ref(false)
 const erroLista = ref('')
 
+// Cancelamento
 const confirmandoId = ref(null)
 const cancelandoId = ref(null)
 const recusa = ref(null)
+
+// Avisos gerais
 const sucesso = ref('')
 const avisoSucesso = ref(null)
+
+// Remarcação
+const remarcandoId = ref(null)
+const agendamentoRemarcando = ref(null)
+
+const dataRemarcacao = ref(null)
+const inicioRemarcacao = ref(null)
+
+const horariosRemarcacao = ref([])
+const carregandoHorariosRemarcacao = ref(false)
+const erroRemarcacao = ref('')
+const enviandoRemarcacao = ref(false)
+
+let pedidoHorariosRemarcacao = 0
+
+const diasRemarcacao = computed(() => {
+  const hoje = new Date()
+
+  return Array.from(
+    { length: DIAS_VISIVEIS },
+    (_, i) =>
+      paraDataIso(
+        new Date(
+          hoje.getFullYear(),
+          hoje.getMonth(),
+          hoje.getDate() + i,
+        ),
+      ),
+  )
+})
+
+function rotuloDiaRemarcacao(dia, i) {
+  if (i === 0) return 'Hoje'
+  if (i === 1) return 'Amanhã'
+
+  return partesDoDia(dia).semana
+}
 
 async function carregar() {
   if (!cliente.logado) return
@@ -53,17 +102,25 @@ async function carregar() {
   } catch (e) {
     if (e.erro === 'NAO_AUTENTICADO') {
       cliente.sair()
+
       erroLista.value =
         'Sua sessão expirou. Entre novamente.'
     } else {
-      erroLista.value = e.mensagem
+      erroLista.value =
+        e.mensagem
     }
   } finally {
     carregando.value = false
   }
 }
 
+// --------------------
+// CANCELAMENTO
+// --------------------
+
 function pedirConfirmacao(id) {
+  fecharRemarcacao()
+
   recusa.value = null
   sucesso.value = ''
   confirmandoId.value = id
@@ -74,7 +131,8 @@ function desistir() {
 }
 
 async function cancelar(agendamento) {
-  const id = agendamento.agendamentoId
+  const id =
+    agendamento.agendamentoId
 
   cancelandoId.value = id
   recusa.value = null
@@ -88,6 +146,7 @@ async function cancelar(agendamento) {
   } catch (e) {
     if (e.erro === 'NAO_AUTENTICADO') {
       cliente.sair()
+
       erroLista.value =
         'Sua sessão expirou. Entre novamente.'
     } else {
@@ -119,7 +178,8 @@ async function cancelar(agendamento) {
   } catch {
     agendamentos.value =
       agendamentos.value.filter(
-        (a) => a.agendamentoId !== id,
+        (a) =>
+          a.agendamentoId !== id,
       )
   }
 
@@ -132,6 +192,202 @@ async function cancelar(agendamento) {
 
   await nextTick()
   avisoSucesso.value?.focus()
+}
+
+// --------------------
+// REMARCAÇÃO — H10.2
+// --------------------
+
+async function abrirRemarcacao(agendamento) {
+  confirmandoId.value = null
+  recusa.value = null
+  sucesso.value = ''
+
+  remarcandoId.value =
+    agendamento.agendamentoId
+
+  agendamentoRemarcando.value =
+    agendamento
+
+  inicioRemarcacao.value = null
+  erroRemarcacao.value = ''
+  horariosRemarcacao.value = []
+
+  const dataAtual =
+    agendamento.inicio?.slice(0, 10)
+
+  dataRemarcacao.value =
+    diasRemarcacao.value.includes(dataAtual)
+      ? dataAtual
+      : diasRemarcacao.value[0]
+
+  await carregarHorariosRemarcacao()
+}
+
+function fecharRemarcacao() {
+  pedidoHorariosRemarcacao++
+
+  remarcandoId.value = null
+  agendamentoRemarcando.value = null
+
+  dataRemarcacao.value = null
+  inicioRemarcacao.value = null
+
+  horariosRemarcacao.value = []
+  erroRemarcacao.value = ''
+
+  carregandoHorariosRemarcacao.value = false
+  enviandoRemarcacao.value = false
+}
+
+async function carregarHorariosRemarcacao() {
+  const agendamento =
+    agendamentoRemarcando.value
+
+  if (
+    !agendamento ||
+    !dataRemarcacao.value
+  ) {
+    return
+  }
+
+  const pedido =
+    ++pedidoHorariosRemarcacao
+
+  carregandoHorariosRemarcacao.value = true
+  erroRemarcacao.value = ''
+  horariosRemarcacao.value = []
+  inicioRemarcacao.value = null
+
+  try {
+    const resposta =
+      await listarHorariosLivres(
+        agendamento.profissionalSlug,
+        {
+          servicoId:
+            agendamento.servicoId,
+
+          data:
+            dataRemarcacao.value,
+        },
+      )
+
+    if (
+      pedido ===
+      pedidoHorariosRemarcacao
+    ) {
+      horariosRemarcacao.value =
+        resposta.horariosLivres
+    }
+
+  } catch (e) {
+    if (
+      pedido ===
+      pedidoHorariosRemarcacao
+    ) {
+      erroRemarcacao.value =
+        e.mensagem
+    }
+  } finally {
+    if (
+      pedido ===
+      pedidoHorariosRemarcacao
+    ) {
+      carregandoHorariosRemarcacao.value =
+        false
+    }
+  }
+}
+
+async function escolherDiaRemarcacao(dia) {
+  if (
+    dataRemarcacao.value === dia
+  ) {
+    return
+  }
+
+  dataRemarcacao.value = dia
+  inicioRemarcacao.value = null
+  erroRemarcacao.value = ''
+
+  await carregarHorariosRemarcacao()
+}
+
+function escolherHorarioRemarcacao(horario) {
+  inicioRemarcacao.value = horario
+  erroRemarcacao.value = ''
+}
+
+async function confirmarRemarcacao() {
+  const agendamento =
+    agendamentoRemarcando.value
+
+  if (
+    !agendamento ||
+    !inicioRemarcacao.value
+  ) {
+    erroRemarcacao.value =
+      'Escolha um novo horário.'
+
+    return
+  }
+
+  enviandoRemarcacao.value = true
+  erroRemarcacao.value = ''
+
+  try {
+    const remarcado =
+      await remarcarAgendamento(
+        agendamento.agendamentoId,
+        inicioRemarcacao.value,
+        cliente.token,
+      )
+
+    const novaDescricao =
+      `${formatarDiaLongo(remarcado.inicio).toLowerCase()}, ` +
+      `às ${formatarHora(remarcado.inicio)}`
+
+    await carregar()
+
+    fecharRemarcacao()
+
+    sucesso.value =
+      `Agendamento remarcado com sucesso para ${novaDescricao}.`
+
+    await nextTick()
+    avisoSucesso.value?.focus()
+
+  } catch (e) {
+    if (
+      e.erro === 'NAO_AUTENTICADO'
+    ) {
+      cliente.sair()
+
+      fecharRemarcacao()
+
+      erroLista.value =
+        'Sua sessão expirou. Entre novamente.'
+
+      return
+    }
+
+    if (
+      e.erro === 'HORARIO_INDISPONIVEL' ||
+      e.erro === 'DATA_INVALIDA'
+    ) {
+      erroRemarcacao.value =
+        MENSAGEM_INDISPONIVEL
+
+      await carregarHorariosRemarcacao()
+
+      return
+    }
+
+    erroRemarcacao.value =
+      e.mensagem
+  } finally {
+    enviandoRemarcacao.value = false
+  }
 }
 
 onMounted(() => {
@@ -335,70 +591,253 @@ onMounted(() => {
                   </div>
                 </div>
 
-                <AppBotao
+                <div
                   v-if="
-                    confirmandoId !==
-                    a.agendamentoId
+                    confirmandoId !== a.agendamentoId &&
+                    remarcandoId !== a.agendamentoId
                   "
-                  variante="contorno"
-                  class="item__cancelar"
-                  :desabilitado="
-                    cancelandoId !== null
-                  "
-                  @click="
-                    pedirConfirmacao(
-                      a.agendamentoId,
-                    )
-                  "
+                  class="item__acoes"
                 >
-                  Cancelar
-                </AppBotao>
-              </div>
-
-              <div
-                v-if="
-                  confirmandoId ===
-                  a.agendamentoId
-                "
-                class="confirmacao"
-                role="group"
-                :aria-label="
-                  `Confirmar cancelamento de ${a.servicoNome}`
-                "
-              >
-                <p>
-                  Cancelar este agendamento?
-                  O horário fica livre para
-                  outras pessoas.
-                </p>
-
-                <div class="confirmacao__botoes">
                   <AppBotao
+                    variante="contorno"
                     :desabilitado="
-                      cancelandoId ===
-                      a.agendamentoId
+                      cancelandoId !== null ||
+                      enviandoRemarcacao
                     "
-                    @click="cancelar(a)"
+                    @click="abrirRemarcacao(a)"
                   >
-                    {{
-                      cancelandoId ===
-                      a.agendamentoId
-                        ? 'Cancelando…'
-                        : 'Sim, cancelar'
-                    }}
+                    Remarcar
                   </AppBotao>
 
                   <AppBotao
                     variante="texto"
                     :desabilitado="
-                      cancelandoId ===
-                      a.agendamentoId
+                      cancelandoId !== null ||
+                      enviandoRemarcacao
                     "
-                    @click="desistir"
+                    @click="
+                      pedirConfirmacao(
+                        a.agendamentoId,
+                      )
+                    "
                   >
-                    Manter
+                    Cancelar
                   </AppBotao>
                 </div>
+              </div>
+
+              <div
+                v-if="
+                  remarcandoId ===
+                  a.agendamentoId
+                "
+                class="remarcacao"
+              >
+                <div class="remarcacao__cabecalho">
+                  <div>
+                    <strong>
+                      Escolha o novo horário
+                    </strong>
+
+                    <p>
+                      {{ a.servicoNome }}
+                      com
+                      {{ a.profissionalNome }}
+                    </p>
+                  </div>
+
+                  <AppBotao
+                    variante="texto"
+                    :desabilitado="
+                      enviandoRemarcacao
+                    "
+                    @click="fecharRemarcacao"
+                  >
+                    Fechar
+                  </AppBotao>
+                </div>
+
+                <div
+                  class="dias-remarcacao"
+                  role="group"
+                  aria-label="Novo dia"
+                >
+                  <button
+                    v-for="(dia, i) in diasRemarcacao"
+                    :key="dia"
+                    type="button"
+                    :aria-pressed="
+                      dia === dataRemarcacao
+                    "
+                    :class="[
+                      'dia-remarcacao',
+                      {
+                        'dia-remarcacao--ativo':
+                          dia === dataRemarcacao,
+                      },
+                    ]"
+                    :disabled="
+                      enviandoRemarcacao
+                    "
+                    @click="
+                      escolherDiaRemarcacao(dia)
+                    "
+                  >
+                    <span
+                      class="dia-remarcacao__semana"
+                    >
+                      {{
+                        rotuloDiaRemarcacao(
+                          dia,
+                          i,
+                        )
+                      }}
+                    </span>
+
+                    <span
+                      class="dia-remarcacao__numero"
+                    >
+                      {{ partesDoDia(dia).dia }}
+                    </span>
+
+                    <span
+                      class="dia-remarcacao__mes"
+                    >
+                      {{ partesDoDia(dia).mes }}
+                    </span>
+                  </button>
+                </div>
+
+                <p class="remarcacao__data">
+                  <AppIcone
+                    nome="calendario"
+                    :tamanho="16"
+                  />
+
+                  {{
+                    formatarDiaLongo(
+                      dataRemarcacao,
+                    )
+                  }}
+                </p>
+
+                <p
+                  v-if="carregandoHorariosRemarcacao"
+                  class="estado-remarcacao"
+                >
+                  Buscando horários livres…
+                </p>
+
+                <template
+                  v-else-if="erroRemarcacao"
+                >
+                  <AppAviso tipo="erro">
+                    {{ erroRemarcacao }}
+                  </AppAviso>
+
+                  <AppBotao
+                    v-if="
+                      !horariosRemarcacao.length
+                    "
+                    variante="contorno"
+                    :desabilitado="
+                      enviandoRemarcacao
+                    "
+                    @click="
+                      carregarHorariosRemarcacao
+                    "
+                  >
+                    Tentar novamente
+                  </AppBotao>
+                </template>
+
+                <div
+                  v-else-if="
+                    !horariosRemarcacao.length
+                  "
+                  class="estado-remarcacao"
+                >
+                  Nenhum horário livre neste dia.
+                  Escolha outra data.
+                </div>
+
+                <div
+                  v-else
+                  class="horarios-remarcacao"
+                  role="group"
+                  aria-label="Novo horário"
+                >
+                  <button
+                    v-for="
+                      horario in horariosRemarcacao
+                    "
+                    :key="horario"
+                    type="button"
+                    :aria-pressed="
+                      horario ===
+                      inicioRemarcacao
+                    "
+                    :class="[
+                      'horario-remarcacao',
+                      {
+                        'horario-remarcacao--ativo':
+                          horario ===
+                          inicioRemarcacao,
+                      },
+                    ]"
+                    :disabled="
+                      enviandoRemarcacao
+                    "
+                    @click="
+                      escolherHorarioRemarcacao(
+                        horario,
+                      )
+                    "
+                  >
+                    {{
+                      formatarHora(horario)
+                    }}
+                  </button>
+                </div>
+
+                <div
+                  v-if="inicioRemarcacao"
+                  class="remarcacao__resumo"
+                >
+                  Novo horário:
+
+                  <strong>
+                    {{
+                      formatarDiaLongo(
+                        inicioRemarcacao,
+                      )
+                    }},
+                    às
+                    {{
+                      formatarHora(
+                        inicioRemarcacao,
+                      )
+                    }}
+                  </strong>
+                </div>
+
+                <AppBotao
+                  tamanho="g"
+                  bloco
+                  :desabilitado="
+                    !inicioRemarcacao ||
+                    enviandoRemarcacao
+                  "
+                  @click="
+                    confirmarRemarcacao
+                  "
+                >
+                  {{
+                    enviandoRemarcacao
+                      ? 'Remarcando…'
+                      : 'Confirmar novo horário'
+                  }}
+                </AppBotao>
               </div>
 
               <AppAviso
@@ -626,6 +1065,136 @@ onMounted(() => {
   gap: 8px;
 }
 
+.item__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.remarcacao {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--cor-fundo);
+}
+
+.remarcacao__cabecalho {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.remarcacao__cabecalho p {
+  margin: 4px 0 0;
+  color: var(--cor-texto-mudo);
+}
+
+.dias-remarcacao {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.dia-remarcacao {
+  flex: 0 0 auto;
+  width: 66px;
+  padding: 9px 0;
+  border: 1.5px solid var(--cor-borda);
+  border-radius: 12px;
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.dia-remarcacao:hover {
+  border-color: var(--cor-destaque);
+}
+
+.dia-remarcacao--ativo {
+  background: var(--cor-destaque);
+  border-color: var(--cor-destaque);
+  color: #fff;
+}
+
+.dia-remarcacao__semana,
+.dia-remarcacao__mes {
+  font-size: 12px;
+}
+
+.dia-remarcacao__numero {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.remarcacao__data {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+}
+
+.horarios-remarcacao {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(82px, 1fr)
+    );
+  gap: 8px;
+}
+
+.horario-remarcacao {
+  min-height: 42px;
+  border: 1.5px solid var(--cor-borda);
+  border-radius: 10px;
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font: inherit;
+  cursor: pointer;
+}
+
+.horario-remarcacao:hover {
+  border-color: var(--cor-destaque);
+}
+
+.horario-remarcacao--ativo {
+  background: var(--cor-destaque);
+  border-color: var(--cor-destaque);
+  color: #fff;
+  font-weight: 600;
+}
+
+.estado-remarcacao {
+  margin: 0;
+  padding: 16px;
+  text-align: center;
+  border-radius: 12px;
+  background: var(--cor-superficie);
+  color: var(--cor-texto-mudo);
+}
+
+.remarcacao__resumo {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--cor-destaque-claro);
+  color: var(--cor-texto-suave);
+}
+
+.remarcacao__resumo strong {
+  color: var(--cor-texto);
+}
+
 @media (max-width: 600px) {
   .cartao {
     padding: 22px 20px;
@@ -648,6 +1217,19 @@ onMounted(() => {
   .item__cancelar {
     grid-column: 2;
     justify-self: start;
+  }
+  .item__acoes {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+
+  .remarcacao__cabecalho {
+    flex-direction: column;
+  }
+
+  .horarios-remarcacao {
+    grid-template-columns:
+      repeat(3, 1fr);
   }
 }
 </style>
