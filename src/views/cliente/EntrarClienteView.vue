@@ -49,6 +49,7 @@ const sucessoRecuperacao = ref('')
 
 watch(aba, () => {
   erro.value = ''
+  erroTelefone.value = ''
 })
 
 function depoisDeEntrar() {
@@ -57,6 +58,7 @@ function depoisDeEntrar() {
 
 async function entrar() {
   erro.value = ''
+  sucessoRecuperacao.value = ''
 
   const telefone =
     normalizarTelefone(login.telefone)
@@ -175,6 +177,7 @@ async function confirmarRecuperacao() {
     recuperacao.codigo = ''
     recuperacao.novaSenha = ''
     recuperacaoSolicitada.value = false
+    aba.value = 'entrar'
 
   } catch (e) {
     erro.value = e.mensagem
@@ -184,6 +187,7 @@ async function confirmarRecuperacao() {
 }
 function abrirRecuperacao() {
   aba.value = 'recuperar'
+  sucessoRecuperacao.value = ''
   recuperacao.telefone = login.telefone
   erro.value = ''
 }
@@ -254,6 +258,9 @@ function voltarParaLogin() {
         </div>
 
         <AppAviso v-if="erro" tipo="erro">{{ erro }}</AppAviso>
+        <AppAviso v-else-if="sucessoRecuperacao && aba === 'entrar'" tipo="sucesso">
+          {{ sucessoRecuperacao }}
+        </AppAviso>
 
         <form
           v-if="aba === 'entrar'"
@@ -273,6 +280,14 @@ function voltarParaLogin() {
             :erro="erroTelefone"
             required
           />
+          <CampoFormulario
+            id="login-senha"
+            v-model="login.senha"
+            rotulo="Senha"
+            tipo="password"
+            autocomplete="current-password"
+            required
+          />
           <AppBotao tipo="submit" tamanho="g" bloco :desabilitado="enviando">
             {{ enviando ? 'Entrando…' : 'Entrar' }}
           </AppBotao>
@@ -290,7 +305,7 @@ function voltarParaLogin() {
         </form>
 
         <form
-          v-else-if="aba === 'criar'">
+          v-else-if="aba === 'criar'"
           id="painel-criar"
           role="tabpanel"
           aria-labelledby="aba-criar"
@@ -314,15 +329,6 @@ function voltarParaLogin() {
             dica="É para ele que enviamos o lembrete por SMS."
             autocomplete="tel"
             :erro="erroTelefone"
-            required
-          />
-          <CampoFormulario
-            id="cad-email"
-            v-model="cadastro.email"
-            rotulo="E-mail"
-            tipo="email"
-            placeholder="voce@exemplo.com"
-            autocomplete="email"
             required
           />
           <CampoFormulario
