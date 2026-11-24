@@ -1,52 +1,49 @@
-# pi4-0101-g4-frontend
-Front-end Projeto Integrador 4 — ReService (Vue 3 + Vite + Vue Router + Pinia + axios).
+# pi4-0101-g4-frontend — Reservice Web SPA (v1.0)
 
-Decisões de arquitetura em `docs/adr/` e fluxos em `docs/fluxos/`.
+Interface web Single Page Application (SPA) do sistema **Reservice**, construída em **Vue.js** (ADR 0003 e ADR 0004) com Vite e servida em produção por **Nginx**.
 
-## Rodando
+- **Repositório:** https://github.com/G14NZS/pi4-0101-g4-frontend.git
 
-O frontend conversa com o [Backend 1](../pi4-0101-g4-backend-1), que roda em Docker. Suba ele primeiro:
+---
+
+## Funcionalidades e Telas Implementadas
+
+### Área Pública e Portal do Cliente (`src/views/cliente/`)
+- **`HomeView.vue`:** Página inicial de apresentação e acesso rápido.
+- **`AgendarView.vue`:** Fluxo público de agendamento pelo link do profissional (`/profissionais/:slug`), seleção de serviço, data e horários livres (`CT3`, `CT5`, `CT7`).
+- **`EntrarClienteView.vue`:** Identificação simplificada pelo telefone e reconhecimento automático de clientes recorrentes (`CT6`).
+- **`MeusAgendamentosView.vue`:** Consulta de agendamentos futuros (`CT8`), cancelamento com liberação imediata de horário (`CT9`) e remarcação (`CT10`).
+
+### Painel do Profissional (`src/views/profissional/`)
+- **`EntrarProfissionalView.vue`:** Autenticação via e-mail e senha com armazenamento de token JWT (`CT1`).
+- **`MeusServicosView.vue`:** Cadastro e listagem de serviços do profissional (`CT2`, `CT3`).
+- **`AgendaDoDiaView.vue`:** Visualização diária dos agendamentos ativos do profissional (`CT11`).
+
+---
+
+## Estrutura de Pastas
+
+- `src/api/` — Clientes HTTP (`http.js`, `erros.js`, `sessoes.js`, `servicos.js`, `clientes.js`, `agendamentos.js`).
+- `src/components/` — Componentes reutilizáveis (`AppAviso.vue`, `AppBotao.vue`, `AppIcone.vue`, `AppLogo.vue`, `CampoFormulario.vue`, `NavProfissional.vue`, `PreviaAgendamento.vue`, `SiteHeader.vue`).
+- `src/router/index.js` — Configuração de rotas SPA e guardas de navegação.
+- `src/stores/` — Gerenciamento de estado (`sessao.js` e `cliente.js`).
+- `src/utils/` — Formatação de datas/telefones (`formatos.js`) e persistência temporária (`agendamentoPendente.js`).
+- `nginx.conf` e `Dockerfile` — Empacotamento estático e roteamento SPA em produção.
+
+---
+
+## Execução Local e Produção
 
 ```sh
-# na pasta do pi4-0101-g4-backend-1
-docker compose up -d --build   # MySQL + API em http://localhost:8080
-```
+# 1. Configurar variáveis de ambiente
+cp .env.example .env
 
-Depois, nesta pasta:
-
-```sh
+# 2. Instalar dependências e rodar em modo desenvolvimento
 npm install
-cp .env.example .env   # VITE_API_URL=http://localhost:8080 (o padrão do Backend 1)
-npm run dev            # http://localhost:5175
+npm run dev
+
+# 3. Gerar build de produção
+npm run build
 ```
 
-Abra **http://localhost:5175** (não `127.0.0.1`): o Backend 1 só libera CORS para essa origem
-(variável `CORS_ORIGENS` no `docker-compose.yml` dele). Por isso o Vite usa a porta 5175 fixa e não sobe se ela
-estiver ocupada; nesse caso, libere a porta ou acrescente a nova origem em `CORS_ORIGENS`.
-
-Login de teste (criado pelo `db/dados-dev.sql` do Backend 1): **ana@exemplo.com / segredo123**.
-
-## O que já funciona
-
-| História | Tela | Contratos |
-|---|---|---|
-| H02.3 | Login do profissional (`/profissional/entrar`) e Meus serviços (`/profissional/servicos`) | CT1, CT2, CT3 |
-| H04.2 | Link do profissional (`/p/{profissionalSlug}`): serviço, dia, horário livre, nome e celular, revisão e confirmação | CT3, CT5, CT7 |
-| H06.2 | Agenda do dia do profissional (`/profissional/agenda`) | CT11 |
-| H07.2 | Meus agendamentos (`/p/{profissionalSlug}/meus-agendamentos`), aberta pelo link do profissional: celular, agendamentos futuros e cancelar | CT8, CT9 |
-
-O token do CT1 é um JWT com `exp`: quando ele vence, a tela volta sozinha ao login.
-
-## Estrutura
-
-```
-src/
-  api/          chamadas HTTP ao Backend 1 (http.js: instância do axios)
-  stores/       stores Pinia
-  router/       rotas da SPA
-  layouts/      layouts compartilhados entre telas
-  views/
-    profissional/  telas do profissional (E1, E2, E8)
-    cliente/       telas do cliente, abertas pelo link do profissional (E4, E5, E7)
-  components/   componentes reutilizáveis
-```
+Quando executado via `docker compose up -d --build` a partir do repositório `pi4-0101-g4-backend-1`, o front-end fica acessível em **`http://localhost:5175`**.
